@@ -98,6 +98,22 @@ void CMAES::initialize() {
 
     sort_data(_param);
 
+    // track top and average performers
+    _top_performer.push_back(_param(0, 9));
+    _avg_parent.push_back(_param.col(9).head(_P).mean());
+    _avg_total.push_back(_param.col(9).mean());
+    _top_obj_pi.push_back(_param(0, 5));
+    _top_obj_pidot.push_back(_param(0, 6));
+    _top_obj_mdot.push_back(_param(0, 7));
+    _top_obj_m.push_back(_param(0, 8));
+
+    // track top decision variables
+    _top_temp.push_back(_param(0, 0));
+    _top_rp.push_back(_param(0, 1));
+    _top_vp.push_back(_param(0, 2));
+    _top_uvi.push_back(_param(0, 3));
+    _top_uvt.push_back(_param(0, 4));
+
 }
 
 // PRIVATE METHODS
