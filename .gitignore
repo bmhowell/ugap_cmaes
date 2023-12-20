@@ -1,0 +1,25 @@
+# Ignore build artifacts
+src/build/
+src/build1/
+src/build2/
+src/build3/
+src/build4/
+output_0/
+output_1/
+output_2/
+output_3/
+output_4/
+
+# Ignore log and data files
+*.log
+*.csv
+*.vtk
+*.py
+
+# Ignore mac files
+*.DS_Store
+
+# Ignore image and gif
+*.png
+*.gif
+

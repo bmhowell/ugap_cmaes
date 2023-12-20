@@ -1,0 +1,70 @@
+// Copyright 2023 Brian Howell
+// MIT License
+// Project: CMA-ES
+
+#ifndef CMAES_H
+#define CMAES_H
+
+#include "common.h"
+#include "Voxel.h"
+
+class CMAES {
+
+  private:
+    // GA parameters
+    int _pop;                                  // population size
+    int _P;                                    // number of parents
+    int _C;                                    // number of children
+    int _G;                                    // number of generations
+   
+    // objective function
+    int _obj_fn;                               // objective function
+    double *_w;                                // weights for objective function
+    size_t _w_size;                            // size of weights array
+
+    std::string _file_path;
+
+    // simulation parameters
+    sim _sim;
+
+    // optimization constraints
+    constraints _c;
+
+    // optimization parameters
+    bopt _b;
+
+    // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
+    Eigen::MatrixXd _param;
+
+    // performance vectors
+    std::vector<double> _top_performer; 
+    std::vector<double> _avg_parent; 
+    std::vector<double> _avg_total;
+    std::vector<double> _top_obj_pi, _top_obj_pidot, _top_obj_mdot, _top_obj_m;
+    std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
+
+    void sort_data(Eigen::MatrixXd& param);
+
+  public:
+  
+    /* overload constructor */
+    CMAES(sim& s,
+          constraints& c, 
+          bopt& b, 
+          int obj_fn, 
+          const double* weights,
+          std::string file_path);
+
+    /* destructor */
+    ~CMAES();
+
+    /* initialize CMAES */
+    void initialize();
+
+    /* optimize CMAES */
+
+    void optimize();
+    
+};
+
+#endif // CMAES_H
