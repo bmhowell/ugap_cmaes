@@ -7,8 +7,6 @@
 #include "helper_functions.h"
 #include "common.h"
 
-void sort_data(Eigen::MatrixXd& PARAM);
-
 int main(int argc, char** argv) {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -40,16 +38,18 @@ int main(int argc, char** argv) {
 	//                     + std::to_string(default_sim.time_stepping); 
     
     // initialize CMA-ES
-    CMAES optimizer = CMAES(s,
-                            c,
-                            b,
-                            obj_fn,
-                            pareto_weights,
-                            file_path);
+    CMAES optimizer = CMAES(s,                  // simulation parameters
+                            c,                  // optimization constraints
+                            b,                  // optimization parameters
+                            obj_fn,             // objective function
+                            5,                  // number of variables
+                            pareto_weights,     // objective function weights
+                            file_path           // file path for output
+                            );
 
     optimizer.initialize();
 
-    optimizer.optimize();
+    // optimizer.optimize();
 
     // Get the current time after the code segment finishes
     auto end = std::chrono::high_resolution_clock::now();
@@ -60,23 +60,3 @@ int main(int argc, char** argv) {
               << " min---" << std::endl;
 }
 
-void sort_data(Eigen::MatrixXd& PARAM){
-    // Custom comparator for sorting by the fourth column in descending order
-    auto comparator = [& PARAM](const Eigen::VectorXd& a, const Eigen::VectorXd& b) {
-        return a(PARAM.cols()-1) < b(PARAM.cols()-1);
-    };
-
-    // Convert Eigen matrix to std::vector of Eigen::VectorXd
-    std::vector<Eigen::VectorXd> rows;
-    for (int i = 0; i < PARAM.rows(); ++i) {
-        rows.push_back(PARAM.row(i));
-    }
-
-    // Sort using the custom comparator
-    std::sort(rows.begin(), rows.end(), comparator);
-
-    // Copy sorted rows back to Eigen matrix
-    for (int i = 0; i < PARAM.rows(); ++i) {
-        PARAM.row(i) = rows[i];
-    }
-}

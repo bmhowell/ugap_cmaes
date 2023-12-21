@@ -18,6 +18,7 @@ class CMAES {
     int _G;                                    // number of generations
    
     // objective function
+    int _n_var;                                // number of variables
     int _obj_fn;                               // objective function
     double *_w;                                // weights for objective function
     size_t _w_size;                            // size of weights array
@@ -43,6 +44,11 @@ class CMAES {
     std::vector<double> _top_obj_pi, _top_obj_pidot, _top_obj_mdot, _top_obj_m;
     std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
 
+    // statistical parameters
+    Eigen::VectorXd _mu_curr;                   // mean vector for current generation
+    Eigen::VectorXd _mu_next;                   // mean vector for next generation
+    Eigen::MatrixXd _sigma;                     // covariance matrix
+
     void sort_data(Eigen::MatrixXd& param);
 
   public:
@@ -51,7 +57,8 @@ class CMAES {
     CMAES(sim& s,
           constraints& c, 
           bopt& b, 
-          int obj_fn, 
+          int obj_fn,
+          int n_var,
           const double* weights,
           std::string file_path);
 

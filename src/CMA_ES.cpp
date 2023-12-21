@@ -8,9 +8,12 @@
 CMAES::CMAES(sim& s,
              constraints& c, 
              bopt& b, 
-             int obj_fn, 
+             int obj_fn,
+             int n_var,
              const double* weights,
              std::string file_path) {
+
+    _file_path = file_path;
 
     // initialize input variables
     _pop = omp_get_num_procs();                                  // population size
@@ -18,6 +21,7 @@ CMAES::CMAES(sim& s,
     _C      = 4;                                                 // number of children
     _G      = 10;                                                // number of generations
     _obj_fn = obj_fn;                                            // objective function
+    _n_var  = n_var;                                             // number of variables
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
     _param.resize(_pop, 10);
@@ -31,7 +35,11 @@ CMAES::CMAES(sim& s,
     _w   = new double[4];
     std::memcpy(_w, weights, 4 * sizeof(double));
 
-    _file_path = file_path;
+    // allocate memory for statistical parameters
+    _mu_curr.resize(_n_var);
+    _mu_next.resize(_n_var);
+    _sigma.resize(_n_var, _n_var);
+
 }
 
 // Destructor
@@ -114,6 +122,66 @@ void CMAES::initialize() {
     _top_uvi.push_back(_param(0, 3));
     _top_uvt.push_back(_param(0, 4));
 
+    // compute current mean vector of top performers
+    _mu_curr = _param.topRows(_P).leftCols(_n_var).colwise().mean();
+
+    // top performers
+    // _param.block(0, 0, _P, _n_var);
+
+    // compute covariance matrix
+    float inv_const = 1. / float(_P);
+    Eigen::MatrixXd centered = _param.rowwise() - _mu_curr.transpose();
+    _sigma = (centered.transpose() * centered) * inv_const;
+
+    std::cout << "covariance matrix: \n" << _sigma << std::endl;
+    std::cout << "\nmean vector: \n" << _mu_curr << std::endl;
+
+}
+
+void CMAES::optimize() {
+    // initialize input variables
+    std::random_device rd;                                          // Obtain a random seed from the hardware
+    std::mt19937 gen(rd());                                         // Seed the random number generator
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);  // Define the range [0.0, 1.0)
+
+    
+
+    // initialize top performers
+    std::cout << "--- STARTING OPTIMIZATION ----" << std::endl;
+    for (int g = 0; g < _G; ++g) {
+        std::cout << "Generation: " << g << std::endl;
+
+        // generate 
+
+        // compute next mean vector
+        _mu_next = _param.topRows(_P).leftCols(_n_var).colwise().mean();
+
+
+
+
+        // // compute mean vector
+        // _mu = _param.colwise().mean();
+        // // std::cout << "mu: " << _mu << std::endl;
+
+        // // compute covariance matrix
+        // Eigen::MatrixXd diff = _param.rowwise() - _mu.transpose();
+        // _sigma = (diff.transpose() * diff) / _param.rows();
+        // // std::cout << "sigma: " << _sigma << std::endl;
+
+        // // compute eigenvalues and eigenvectors
+        // Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(_sigma);
+        // Eigen::VectorXd eigenvalues = solver.eigenvalues();
+        // Eigen::MatrixXd eigenvectors = solver.eigenvectors();
+        // // std::cout << "eigenvalues: " << eigenvalues << std::endl;
+        // // std::cout << "eigenvectors: " << eigenvectors << std::endl;
+
+        // // compute step size
+        // double step_size = 1. / (1. + 2. * _param.rows() / _param.cols());
+        // // std::cout << "step size: " << step_size << std::endl;
+
+        // // compute rank one update
+        // // Eigen::VectorXd rank_one_update = step_size * sqrt(_param.cols()) * (eigenvectors * eigenvalues.cwiseSqrt().asDiagonal()) * eigenvectors.transpose() * (_param.col(9) - _mu(9));
+    }
 }
 
 // PRIVATE METHODS
