@@ -36,6 +36,9 @@ CMAES::CMAES(sim& s,
     std::memcpy(_w, weights, 4 * sizeof(double));
 
     // allocate memory for statistical parameters
+    normed_data = false;
+    _min_param.resize(_n_var);
+    _max_param.resize(_n_var);
     _mu_curr.resize(_n_var);
     _mu_next.resize(_n_var);
     _sigma.resize(_n_var, _n_var);
@@ -49,12 +52,12 @@ CMAES::~CMAES() {
 }
 
 void CMAES::initialize() {
-    // initialize input variables
+    // set random device and generator
     std::random_device rd;                                          // Obtain a random seed from the hardware
     std::mt19937 gen(rd());                                         // Seed the random number generator
     std::uniform_real_distribution<double> distribution(0.0, 1.0);  // Define the range [0.0, 1.0)
 
-    // initials input samples
+    // initialize input samples
     std::cout << "--- INITIALIZING FIRST RUN ----" << std::endl;
     for (int i = 0; i < _param.rows(); ++i){
         _param(i, 0) = _c.min_temp + (_c.max_temp - _c.min_temp) * distribution(gen);
@@ -94,11 +97,11 @@ void CMAES::initialize() {
                     _param(p, 6) = sim.getObjPIDot();
                     _param(p, 5) = sim.getObjPI();
                 } else {
-                    _param(p, 9) = 1000.;
-                    _param(p, 8) = 1000.;
-                    _param(p, 7) = 1000.;
-                    _param(p, 6) = 1000.;
-                    _param(p, 5) = 1000.;
+                    _param(p, 9) = 100.;
+                    _param(p, 8) = 100.;
+                    _param(p, 7) = 100.;
+                    _param(p, 6) = 100.;
+                    _param(p, 5) = 100.;
 
                 }
             }
@@ -121,6 +124,9 @@ void CMAES::initialize() {
     _top_vp.push_back(_param(0, 2));
     _top_uvi.push_back(_param(0, 3));
     _top_uvt.push_back(_param(0, 4));
+
+    // normalize data
+
 
     // compute current mean vector of top performers
     _mu_curr = _param.topRows(_P).leftCols(_n_var).colwise().mean();
@@ -155,9 +161,6 @@ void CMAES::optimize() {
 
         // compute next mean vector
         _mu_next = _param.topRows(_P).leftCols(_n_var).colwise().mean();
-
-
-
 
         // // compute mean vector
         // _mu = _param.colwise().mean();
@@ -204,4 +207,34 @@ void CMAES::sort_data(Eigen::MatrixXd& param) {
     for (int i = 0; i < param.rows(); ++i) {
         param.row(i) = rows[i];
     }
+}
+
+void CMAES::norm_data(Eigen::MatrixXd& param) {
+    // check if data is already normalized
+    if (normed_data) { return; }
+
+    // normalize data
+    for (int i = 0; i < param.cols(); ++i) {
+        // store min/max value for each variable
+        _min_param(i) = param.col(i).minCoeff();
+        _max_param(i) = param.col(i).maxCoeff();
+        
+        param.col(i) = (param.col(i).array() - _min_param(i)) / (_max_param(i) - _min_param(i));
+    }
+
+    // set flag
+    normed_data = true;
+}
+
+void CMAES::unnorm_data(Eigen::MatrixXd& param) {
+    // check if data is already unnormalized
+    if (!normed_data) { return; }
+
+    // unnormalize data
+    for (int i = 0; i < param.cols(); ++i) {
+        param.col(i) = param.col(i).array() * (_max_param(i) - _min_param(i)) + _min_param(i);
+    }
+
+    // set flag
+    normed_data = false;
 }

@@ -45,11 +45,18 @@ class CMAES {
     std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
 
     // statistical parameters
+    bool normed_data;                           // flag for normalized data
+    Eigen::VectorXd _min_param;                 // min param for each var, used for normalization
+    Eigen::VectorXd _max_param;                 // max param for each var, used for normalization
     Eigen::VectorXd _mu_curr;                   // mean vector for current generation
     Eigen::VectorXd _mu_next;                   // mean vector for next generation
     Eigen::MatrixXd _sigma;                     // covariance matrix
 
     void sort_data(Eigen::MatrixXd& param);
+
+    void norm_data(Eigen::MatrixXd& param);
+
+    void unnorm_data(Eigen::MatrixXd& param);
 
   public:
   
