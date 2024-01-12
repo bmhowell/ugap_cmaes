@@ -17,8 +17,8 @@ CMAES::CMAES(sim& s,
 
     // initialize input variables
     _pop        = omp_get_num_procs();                           // population size
-    _P          = 4;                                             // number of parents
-    _C          = 4;                                             // number of children
+    _m_elite    = 4;                                             // number of parents
+    _c          = 4;                                             // number of children
     _G          = 10;                                            // number of generations
     _obj_fn     = obj_fn;                                        // objective function
     _n_var      = n_var;                                         // number of variables
@@ -30,21 +30,21 @@ CMAES::CMAES(sim& s,
     _param_next.resize(_pop, 10);
 
     // initialize simulation/optimization parameters and constraints
-    _sim = s;
-    _b   = b;
-    _c   = c;
+    _sim   = s;
+    _b     = b;
+    _con   = c;
 
     // objective function weights
     _w   = new double[4];
     std::memcpy(_w, weights, 4 * sizeof(double));
 
     // allocate memory for statistical parameters
-    normed_data = false;
+    _stdzd = false;
     _min_param.resize(_n_var);
     _max_param.resize(_n_var);
     _mu_curr.resize(_n_var);
     _mu_next.resize(_n_var);
-    _sigma.resize(_n_var, _n_var);
+    _Cov.resize(_n_var, _n_var);
 
 }
 
@@ -55,19 +55,20 @@ CMAES::~CMAES() {
 }
 
 void CMAES::initialize() {
-  // set random device and generator
-  std::random_device rd;                                          // Obtain a random seed from the hardware
-  std::mt19937 gen(rd());                                         // Seed the random number generator
-  std::uniform_real_distribution<double> udis(0.0, 1.0);          // Define the range [0.0, 1.0)
+  // set up random number generator
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::normal_distribution<double> ndis(0.0,  1.0);
+  std::uniform_real_distribution<double> udis(0.0, 1.0);
 
   // generate random samples for bootstrap
   std::cout << "---- INITIALIZING FIRST RUN ----" << std::endl;
   for (int i = 0; i < _pop; ++i){
-    _param_curr(i, 0) = _c.min_temp + (_c.max_temp - _c.min_temp) * udis(gen);
-    _param_curr(i, 1) = _c.min_rp   + (_c.max_rp   - _c.min_rp)   * udis(gen);
-    _param_curr(i, 2) = _c.min_vp   + (_c.max_vp   - _c.min_vp)   * udis(gen);
-    _param_curr(i, 3) = _c.min_uvi  + (_c.max_uvi  - _c.min_uvi)  * udis(gen);
-    _param_curr(i, 4) = _c.min_uvt  + (_c.max_uvt  - _c.min_uvt)  * udis(gen);
+    _param_curr(i, 0) = _con.min_temp + (_con.max_temp - _con.min_temp) * udis(gen);
+    _param_curr(i, 1) = _con.min_rp   + (_con.max_rp   - _con.min_rp)   * udis(gen);
+    _param_curr(i, 2) = _con.min_vp   + (_con.max_vp   - _con.min_vp)   * udis(gen);
+    _param_curr(i, 3) = _con.min_uvi  + (_con.max_uvi  - _con.min_uvi)  * udis(gen);
+    _param_curr(i, 4) = _con.min_uvt  + (_con.max_uvt  - _con.min_uvt)  * udis(gen);
   }
 
   // initialize top performers
@@ -82,7 +83,8 @@ void CMAES::initialize() {
               _param_curr(p, 4),          // uv exposure time
               _file_path,
               _mthread);
-    sim.computeParticles(_param_curr(p, 1), _param_curr(p, 2));
+    sim.computeParticles(_param_curr(p, 1),
+                         _param_curr(p, 2));
     sim.simulate(_sim.method,             // time stepping scheme
                  _save_voxel,             // save voxel values
                  _obj_fn,                 // objective function
@@ -92,7 +94,6 @@ void CMAES::initialize() {
     #pragma omp critical
     {
       int thread_id = omp_get_thread_num();
-      // std::cout << "Thread " << thread_id << std::endl;
       if (!std::isnan(sim.getObjective())) {
         _param_curr(p, 9) = sim.getObjective();
         _param_curr(p, 8) = sim.getObjM();
@@ -109,10 +110,8 @@ void CMAES::initialize() {
     }
   }
 
-  std::cout << "_param_curr: \n" << _param_curr << std::endl;
-
   // rank candidates
-  sort_data(_param_curr);
+  this->sort_data(_param_curr);
 
   // store top performers
   _top_performer.push_back(_param_curr(0, 9));
@@ -128,16 +127,22 @@ void CMAES::initialize() {
   _top_uvi.push_back(_param_curr(0, 3));
   _top_uvt.push_back(_param_curr(0, 4));
 
-  // store average top _P performers
-  _avg_parent.push_back(_param_curr.col(9).head(_P).mean());
+  // store average top _m_elite performers
+  _avg_parent.push_back(_param_curr.col(9).head(_m_elite).mean());
 
   // store average total population
   _avg_total.push_back(_param_curr.col(9).mean());
 
-  std::cout << "_param_curr: \n" << _param_curr << std::endl;
+  this->stdz_data(_param_curr);
+  this->unstdz_data(_param_curr);
 }
 
 void CMAES::optimize() {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::normal_distribution<double> dis_normal(0.0, 1.0);
+  std::uniform_real_distribution<> dis_uniform(0.0, 1.0);
+
     
 }
 // PRIVATE METHODS
@@ -162,32 +167,32 @@ void CMAES::sort_data(Eigen::MatrixXd& param) {
     }
 }
 
-void CMAES::norm_data(Eigen::MatrixXd& param) {
+void CMAES::stdz_data(Eigen::MatrixXd& param) {
     // check if data is already normalized
-    if (normed_data) { return; }
+    if (_stdzd) { return; }
+    // compute mean and stddev for param data
+    _stdz_avg = param.block(0, 0, _pop, _n_var).colwise().mean();
+    _stdz_std = ((param.block(0, 0, _pop, _n_var).rowwise() - _stdz_avg.transpose()).array().square().colwise().sum() / (_pop - 1)).sqrt();
 
-    // normalize data
-    for (int i = 0; i < param.cols(); ++i) {
-        // store min/max value for each variable
-        _min_param(i) = param.col(i).minCoeff();
-        _max_param(i) = param.col(i).maxCoeff();
-        
-        param.col(i) = (param.col(i).array() - _min_param(i)) / (_max_param(i) - _min_param(i));
+    // standardize the data
+    for (int i = 0; i < _n_var; ++i) {
+        param.col(i) = (param.col(i).array() - _stdz_avg(i)) / _stdz_std(i);
     }
 
+
     // set flag
-    normed_data = true;
+    _stdzd = true;
 }
 
-void CMAES::unnorm_data(Eigen::MatrixXd& param) {
+void CMAES::unstdz_data(Eigen::MatrixXd& param) {
     // check if data is already unnormalized
-    if (!normed_data) { return; }
+    if (!_stdzd) { return; }
 
-    // unnormalize data
-    for (int i = 0; i < param.cols(); ++i) {
-        param.col(i) = param.col(i).array() * (_max_param(i) - _min_param(i)) + _min_param(i);
+    // un-standardize data
+    for (int i = 0; i < _n_var; ++i) {
+        param.col(i) = (param.col(i).array() * _stdz_std(i)) + _stdz_avg(i);
     }
 
     // set flag
-    normed_data = false;
+    _stdzd = false;
 }

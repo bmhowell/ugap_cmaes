@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
     // optimizer.initialize();
 
     optimizer.initialize();
+    // optimizer.optimize();
 
     // Get the current time after the code segment finishes
     auto end = std::chrono::high_resolution_clock::now();

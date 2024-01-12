@@ -11,11 +11,7 @@
 class CMAES {
 
   private:
-    // GA parameters
-    int _pop;                                  // population size
-    int _P;                                    // number of parents
-    int _C;                                    // number of children
-    int _G;                                    // number of generations
+    // print/saving options
     bool _mthread;                             // flag for multithreading
     bool _save_voxel;                          // flag for saving voxel data
 
@@ -31,18 +27,24 @@ class CMAES {
     sim _sim;
 
     // optimization constraints
-    constraints _c;
+    constraints _con;
 
     // optimization parameters
     bopt _b;
 
+    // standardization parameters
+    Eigen::VectorXd _stdz_avg;
+    Eigen::VectorXd _stdz_std;
+    
+
     // CMA-ES parameters
-    // double _sigma;                              // step size
-    // int    _m;                                  // pop size
-    // int    _m_eite;                             // num elites
+    double _sigma;                              // step size
+    int    _c;                                  // num of children
+    int    _pop;                                // pop size
+    int    _G;                                  // num of generations
+    int    _m;                                  // pop size
+    int    _m_elite;                            // num elites
     int    _n_var;                              // number of variables
-
-
 
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
@@ -56,18 +58,18 @@ class CMAES {
     std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
 
     // statistical parameters
-    bool normed_data;                           // flag for normalized data
+    bool _stdzd;                                // flag for normalized data
     Eigen::VectorXd _min_param;                 // min param for each var, used for normalization
     Eigen::VectorXd _max_param;                 // max param for each var, used for normalization
     Eigen::VectorXd _mu_curr;                   // mean vector for current generation
     Eigen::VectorXd _mu_next;                   // mean vector for next generation
-    Eigen::MatrixXd _sigma;                     // covariance matrix
+    Eigen::MatrixXd _Cov;                       // covariance matrix
 
     void sort_data(Eigen::MatrixXd& param);
 
-    void norm_data(Eigen::MatrixXd& param);
+    void stdz_data(Eigen::MatrixXd& param);
 
-    void unnorm_data(Eigen::MatrixXd& param);
+    void unstdz_data(Eigen::MatrixXd& param);
 
   public:
   
