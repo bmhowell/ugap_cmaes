@@ -47,9 +47,9 @@ int main(int argc, char** argv) {
                             file_path           // file path for output
                             );
 
-    optimizer.initialize();
+    // optimizer.initialize();
 
-    // optimizer.optimize();
+    optimizer.initialize();
 
     // Get the current time after the code segment finishes
     auto end = std::chrono::high_resolution_clock::now();

@@ -16,15 +16,18 @@ CMAES::CMAES(sim& s,
     _file_path = file_path;
 
     // initialize input variables
-    _pop = omp_get_num_procs();                                  // population size
-    _P      = 4;                                                 // number of parents
-    _C      = 4;                                                 // number of children
-    _G      = 10;                                                // number of generations
-    _obj_fn = obj_fn;                                            // objective function
-    _n_var  = n_var;                                             // number of variables
+    _pop        = omp_get_num_procs();                           // population size
+    _P          = 4;                                             // number of parents
+    _C          = 4;                                             // number of children
+    _G          = 10;                                            // number of generations
+    _obj_fn     = obj_fn;                                        // objective function
+    _n_var      = n_var;                                         // number of variables
+    _mthread    = true;                                          // multithread flag
+    _save_voxel = false;                                         // save voxel values
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
-    _param.resize(_pop, 10);
+    _param_curr.resize(_pop, 10);
+    _param_next.resize(_pop, 10);
 
     // initialize simulation/optimization parameters and constraints
     _sim = s;
@@ -52,141 +55,91 @@ CMAES::~CMAES() {
 }
 
 void CMAES::initialize() {
-    // set random device and generator
-    std::random_device rd;                                          // Obtain a random seed from the hardware
-    std::mt19937 gen(rd());                                         // Seed the random number generator
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);  // Define the range [0.0, 1.0)
+  // set random device and generator
+  std::random_device rd;                                          // Obtain a random seed from the hardware
+  std::mt19937 gen(rd());                                         // Seed the random number generator
+  std::uniform_real_distribution<double> udis(0.0, 1.0);          // Define the range [0.0, 1.0)
 
-    // initialize input samples
-    std::cout << "--- INITIALIZING FIRST RUN ----" << std::endl;
-    for (int i = 0; i < _param.rows(); ++i){
-        _param(i, 0) = _c.min_temp + (_c.max_temp - _c.min_temp) * distribution(gen);
-        _param(i, 1) = _c.min_rp   + (_c.max_rp   - _c.min_rp)   * distribution(gen);
-        _param(i, 2) = _c.min_vp   + (_c.max_vp   - _c.min_vp)   * distribution(gen);
-        _param(i, 3) = _c.min_uvi  + (_c.max_uvi  - _c.min_uvi)  * distribution(gen);
-        _param(i, 4) = _c.min_uvt  + (_c.max_uvt  - _c.min_uvt)  * distribution(gen);
+  // generate random samples for bootstrap
+  std::cout << "---- INITIALIZING FIRST RUN ----" << std::endl;
+  for (int i = 0; i < _pop; ++i){
+    _param_curr(i, 0) = _c.min_temp + (_c.max_temp - _c.min_temp) * udis(gen);
+    _param_curr(i, 1) = _c.min_rp   + (_c.max_rp   - _c.min_rp)   * udis(gen);
+    _param_curr(i, 2) = _c.min_vp   + (_c.max_vp   - _c.min_vp)   * udis(gen);
+    _param_curr(i, 3) = _c.min_uvi  + (_c.max_uvi  - _c.min_uvi)  * udis(gen);
+    _param_curr(i, 4) = _c.min_uvt  + (_c.max_uvt  - _c.min_uvt)  * udis(gen);
+  }
+
+  // initialize top performers
+  #pragma omp parallel for
+  for (int p = 0; p < _pop; ++p) {
+    Voxel sim(_sim.tfinal,                // tot sim time
+              _sim.dt,                    // time step
+              _sim.node,                  // num nodes
+              _sim.time_stepping,         // sim id
+              _param_curr(p, 0),          // amb temp
+              _param_curr(p, 3),          // uv intensity
+              _param_curr(p, 4),          // uv exposure time
+              _file_path,
+              _mthread);
+    sim.computeParticles(_param_curr(p, 1), _param_curr(p, 2));
+    sim.simulate(_sim.method,             // time stepping scheme
+                 _save_voxel,             // save voxel values
+                 _obj_fn,                 // objective function
+                 _w                       // pareto weights
+                );
+
+    #pragma omp critical
+    {
+      int thread_id = omp_get_thread_num();
+      // std::cout << "Thread " << thread_id << std::endl;
+      if (!std::isnan(sim.getObjective())) {
+        _param_curr(p, 9) = sim.getObjective();
+        _param_curr(p, 8) = sim.getObjM();
+        _param_curr(p, 7) = sim.getObjMDot();
+        _param_curr(p, 6) = sim.getObjPIDot();
+        _param_curr(p, 5) = sim.getObjPI();
+      } else {
+        _param_curr(p, 9) = 1000.;
+        _param_curr(p, 8) = 1000.;
+        _param_curr(p, 7) = 1000.;
+        _param_curr(p, 6) = 1000.;
+        _param_curr(p, 5) = 1000.;
+      }
     }
+  }
 
-    // initialize top performers
-    #pragma omp parallel for
-    for (int p = 0; p < _pop; ++p) {
-        Voxel sim(_sim.tfinal,           // tot sim time
-                  _sim.dt,               // time step
-                  _sim.node,             // num nodes
-                  _sim.time_stepping,    // sim id
-                  _param(p, 0),          // amb temp
-                  _param(p, 3),          // uv intensity
-                  _param(p, 4),          // uv exposure time
-                  _file_path,            // file path
-                  true                   // multithread
-                  );
-        sim.computeParticles(_param(p, 1), _param(p, 2));
-        sim.simulate(_sim.method,        // time stepping scheme
-                    false,               // save voxel values
-                    _obj_fn,             // objective function
-                    _w                   // pareto weights
-                  );
-        #pragma omp critical
-            {
-                int thread_id = omp_get_thread_num();
-                // std::cout << "Thread " << thread_id << std::endl;
-                if (!std::isnan(sim.getObjective())) {
-                    _param(p, 9) = sim.getObjective();
-                    _param(p, 8) = sim.getObjM();
-                    _param(p, 7) = sim.getObjMDot();
-                    _param(p, 6) = sim.getObjPIDot();
-                    _param(p, 5) = sim.getObjPI();
-                } else {
-                    _param(p, 9) = 100.;
-                    _param(p, 8) = 100.;
-                    _param(p, 7) = 100.;
-                    _param(p, 6) = 100.;
-                    _param(p, 5) = 100.;
+  std::cout << "_param_curr: \n" << _param_curr << std::endl;
 
-                }
-            }
-    }
+  // rank candidates
+  sort_data(_param_curr);
 
-    sort_data(_param);
+  // store top performers
+  _top_performer.push_back(_param_curr(0, 9));
+  _top_obj_m.push_back(_param_curr(0, 8));
+  _top_obj_mdot.push_back(_param_curr(0, 7));
+  _top_obj_pidot.push_back(_param_curr(0, 6));
+  _top_obj_pi.push_back(_param_curr(0, 5));
 
-    // track top and average performers
-    _top_performer.push_back(_param(0, 9));
-    _avg_parent.push_back(_param.col(9).head(_P).mean());
-    _avg_total.push_back(_param.col(9).mean());
-    _top_obj_pi.push_back(_param(0, 5));
-    _top_obj_pidot.push_back(_param(0, 6));
-    _top_obj_mdot.push_back(_param(0, 7));
-    _top_obj_m.push_back(_param(0, 8));
+  // store top performer parameters
+  _top_temp.push_back(_param_curr(0, 0));
+  _top_rp.push_back(_param_curr(0, 1));
+  _top_vp.push_back(_param_curr(0, 2));
+  _top_uvi.push_back(_param_curr(0, 3));
+  _top_uvt.push_back(_param_curr(0, 4));
 
-    // track top decision variables
-    _top_temp.push_back(_param(0, 0));
-    _top_rp.push_back(_param(0, 1));
-    _top_vp.push_back(_param(0, 2));
-    _top_uvi.push_back(_param(0, 3));
-    _top_uvt.push_back(_param(0, 4));
+  // store average top _P performers
+  _avg_parent.push_back(_param_curr.col(9).head(_P).mean());
 
-    // normalize data
+  // store average total population
+  _avg_total.push_back(_param_curr.col(9).mean());
 
-
-    // compute current mean vector of top performers
-    _mu_curr = _param.topRows(_P).leftCols(_n_var).colwise().mean();
-
-    // top performers
-    // _param.block(0, 0, _P, _n_var);
-
-    // compute covariance matrix
-    float inv_const = 1. / float(_P);
-    Eigen::MatrixXd centered = _param.rowwise() - _mu_curr.transpose();
-    _sigma = (centered.transpose() * centered) * inv_const;
-
-    std::cout << "covariance matrix: \n" << _sigma << std::endl;
-    std::cout << "\nmean vector: \n" << _mu_curr << std::endl;
-
+  std::cout << "_param_curr: \n" << _param_curr << std::endl;
 }
 
 void CMAES::optimize() {
-    // initialize input variables
-    std::random_device rd;                                          // Obtain a random seed from the hardware
-    std::mt19937 gen(rd());                                         // Seed the random number generator
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);  // Define the range [0.0, 1.0)
-
     
-
-    // initialize top performers
-    std::cout << "--- STARTING OPTIMIZATION ----" << std::endl;
-    for (int g = 0; g < _G; ++g) {
-        std::cout << "Generation: " << g << std::endl;
-
-        // generate 
-
-        // compute next mean vector
-        _mu_next = _param.topRows(_P).leftCols(_n_var).colwise().mean();
-
-        // // compute mean vector
-        // _mu = _param.colwise().mean();
-        // // std::cout << "mu: " << _mu << std::endl;
-
-        // // compute covariance matrix
-        // Eigen::MatrixXd diff = _param.rowwise() - _mu.transpose();
-        // _sigma = (diff.transpose() * diff) / _param.rows();
-        // // std::cout << "sigma: " << _sigma << std::endl;
-
-        // // compute eigenvalues and eigenvectors
-        // Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(_sigma);
-        // Eigen::VectorXd eigenvalues = solver.eigenvalues();
-        // Eigen::MatrixXd eigenvectors = solver.eigenvectors();
-        // // std::cout << "eigenvalues: " << eigenvalues << std::endl;
-        // // std::cout << "eigenvectors: " << eigenvectors << std::endl;
-
-        // // compute step size
-        // double step_size = 1. / (1. + 2. * _param.rows() / _param.cols());
-        // // std::cout << "step size: " << step_size << std::endl;
-
-        // // compute rank one update
-        // // Eigen::VectorXd rank_one_update = step_size * sqrt(_param.cols()) * (eigenvectors * eigenvalues.cwiseSqrt().asDiagonal()) * eigenvectors.transpose() * (_param.col(9) - _mu(9));
-    }
 }
-
 // PRIVATE METHODS
 void CMAES::sort_data(Eigen::MatrixXd& param) {
     // Custom comparator for sorting by the fourth column in descending order

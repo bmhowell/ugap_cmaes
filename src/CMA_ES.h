@@ -16,9 +16,11 @@ class CMAES {
     int _P;                                    // number of parents
     int _C;                                    // number of children
     int _G;                                    // number of generations
-   
+    bool _mthread;                             // flag for multithreading
+    bool _save_voxel;                          // flag for saving voxel data
+
+
     // objective function
-    int _n_var;                                // number of variables
     int _obj_fn;                               // objective function
     double *_w;                                // weights for objective function
     size_t _w_size;                            // size of weights array
@@ -34,8 +36,17 @@ class CMAES {
     // optimization parameters
     bopt _b;
 
+    // CMA-ES parameters
+    // double _sigma;                              // step size
+    // int    _m;                                  // pop size
+    // int    _m_eite;                             // num elites
+    int    _n_var;                              // number of variables
+
+
+
+
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
-    Eigen::MatrixXd _param;
+    Eigen::MatrixXd _param_curr, _param_next;
 
     // performance vectors
     std::vector<double> _top_performer; 
@@ -76,7 +87,6 @@ class CMAES {
     void initialize();
 
     /* optimize CMAES */
-
     void optimize();
     
 };
