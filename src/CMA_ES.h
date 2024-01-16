@@ -32,19 +32,13 @@ class CMAES {
     // optimization parameters
     bopt _b;
 
-    // standardization parameters
-    Eigen::VectorXd _stdz_avg;
-    Eigen::VectorXd _stdz_std;
-    
-
     // CMA-ES parameters
     double _sigma;                              // step size
     int    _c;                                  // num of children
-    int    _pop;                                // pop size
     int    _G;                                  // num of generations
     int    _m;                                  // pop size
     int    _m_elite;                            // num elites
-    int    _n_var;                              // number of variables
+    int    _n;                              // number of variables
 
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
@@ -59,11 +53,14 @@ class CMAES {
 
     // statistical parameters
     bool _stdzd;                                // flag for normalized data
-    Eigen::VectorXd _min_param;                 // min param for each var, used for normalization
-    Eigen::VectorXd _max_param;                 // max param for each var, used for normalization
-    Eigen::VectorXd _mu_curr;                   // mean vector for current generation
-    Eigen::VectorXd _mu_next;                   // mean vector for next generation
-    Eigen::MatrixXd _Cov;                       // covariance matrix
+
+    Eigen::VectorXd _max_constraints;           // max constraints        ∈ ℝ(n_var)
+    Eigen::VectorXd _min_constraints;           // min constraints        ∈ ℝ(n_var)
+    Eigen::VectorXd _stdz_avg;                  // param averages         ∈ ℝ(n_var)
+    Eigen::VectorXd _stdz_std;                  // param stds             ∈ ℝ(n_var)
+    Eigen::MatrixXd _Cov;                       // covariance matrix      ∈ ℝ(n_var x n_var)
+    Eigen::MatrixXd _Xs;                        // stdzd, transposed data ∈ ℝ(n_var x m)
+    Eigen::VectorXd _mu;                        // mean vector            ∈ ℝ(n_var)
 
     void sort_data(Eigen::MatrixXd& param);
 
