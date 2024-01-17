@@ -62,6 +62,10 @@ class CMAES {
     Eigen::MatrixXd _Xs;                        // stdzd, transposed data ∈ ℝ(n_var x m)
     Eigen::VectorXd _mu;                        // mean vector            ∈ ℝ(n_var)
 
+    void init_Cov(Eigen::MatrixXd& Cov, Eigen::VectorXd& mu);
+
+    void gen_Zs(Eigen::MatrixXd& Z);
+
     void sort_data(Eigen::MatrixXd& param);
 
     void stdz_data(Eigen::MatrixXd& param);

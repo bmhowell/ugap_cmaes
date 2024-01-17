@@ -162,10 +162,7 @@ void CMAES::initialize() {
 }
 
 void CMAES::optimize() {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::normal_distribution<double> ndis(0.0, 1.0);
-  std::uniform_real_distribution<> udis(0.0, 1.0);
+  
 
   // set sample wieghts
   Eigen::VectorXd ws(_m);
@@ -187,11 +184,10 @@ void CMAES::optimize() {
 
   ws.tail(_m - _m_elite) *= -(1. + c1/cmu) / ws.tail(_m - _m_elite).sum();
   
-  // initialize mean and diff
-  Eigen::VectorXd mu(_n), d(_n);
+  // initialize mean
+  Eigen::VectorXd mu(_n);
   for (int i = 0; i < _n; ++i) {
     mu(i) = (_max_constraints(i) + _min_constraints(i)) * 0.5;
-    d(i)  = _max_constraints(i) - _min_constraints(i);
   }
   _stdz_avg = mu;
 
@@ -203,14 +199,21 @@ void CMAES::optimize() {
                             );
   }
 
+  // scale 
+
   Eigen::VectorXd ps = Eigen::VectorXd::Zero(_n);
   Eigen::VectorXd pc = Eigen::VectorXd::Zero(_n);
-  Eigen::MatrixXd C  = 0.5 * d.asDiagonal();
+  Eigen::MatrixXd C(_n, _n);
   Eigen::MatrixXd Xs(_n, _m);
   Eigen::MatrixXd Zs(_n, _m);
   Eigen::MatrixXd delta_xs = Eigen::MatrixXd::Zero(_n, _m);
   Eigen::VectorXd delta_ws(_n);
   Eigen::VectorXd w0(_m);
+
+  // initialize cov matrix
+  this->init_Cov(C, mu);
+  
+  std::cout << "C: \n" << C << std::endl;
 
   // begin optimization loop
   for (int g = 0; g < 1; ++g) {
@@ -220,9 +223,15 @@ void CMAES::optimize() {
     if (lltOfC.info() == Eigen::NumericalIssue) { std::cerr << "LLT failed!" << std::endl; }
     Eigen::MatrixXd L = lltOfC.matrixL();
 
+    std::cout << "L: \n" << L << std::endl;
+
     // sample from multivariate normal distribution
     std::cout << "mu: " << mu.transpose() << std::endl;
-    Zs = Eigen::MatrixXd::NullaryExpr(_n, _m, [&]() { return udis(gen); });
+    
+    // generate Zs
+    this->gen_Zs(Zs);
+    
+
     std::cout << "Zs: " << Zs << std::endl;
     std::cout << std::endl << std::endl;
     Xs = (_sigma * L * Zs).colwise() + mu;
@@ -342,6 +351,37 @@ void CMAES::optimize() {
   }
 }
 // PRIVATE METHODS
+void CMAES::init_Cov(Eigen::MatrixXd& C, Eigen::VectorXd& mu) {
+  for (int i = 0; i < _n; ++i) {
+    for (int j = 0; j < _n; ++j) {
+      if (i == j) {
+        C(i, j) = std::sqrt(  ((_max_constraints(i) - mu(i)) * (_max_constraints(j) - mu(j))
+                            +  (_min_constraints(i) - mu(i)) * (_min_constraints(j) - mu(j)))
+                              * 0.5
+                            );
+      } else {
+        C(i, j) = std::sqrt(  ((_max_constraints(i) - mu(i)) * (_max_constraints(j) - mu(j))
+                            +  (_min_constraints(i) - mu(i)) * (_min_constraints(j) - mu(j)))
+                              * 0.5
+                            );
+        C(j, i) = C(i, j);
+
+      }
+    }
+  }
+}
+void CMAES::gen_Zs(Eigen::MatrixXd& Z) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::normal_distribution<double> ndis(0.0, 1.0);
+  std::uniform_real_distribution<> udis(0.0, 1.0);
+  for (int i = 0; i < _m; ++i) {
+      for (int j = 0; j < _n; ++j) {
+        Z(j, i) = ndis(gen);
+      }
+    }
+}
+
 void CMAES::sort_data(Eigen::MatrixXd& param) {
     // Custom comparator for sorting by the fourth column in descending order
     auto comparator = [& param](const Eigen::VectorXd& a, const Eigen::VectorXd& b) {
