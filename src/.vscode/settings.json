@@ -83,6 +83,7 @@
       "charconv": "cpp",
       "deque": "cpp",
       "semaphore": "cpp",
-      "span": "cpp"
+      "span": "cpp",
+      "numbers": "cpp"
     }
 }

@@ -33,16 +33,16 @@ class CMAES {
     bopt _b;
 
     // CMA-ES parameters
-    double _sigma;                              // step size
-    int    _c;                                  // num of children
+    int    _top_evals;                          // num of evals per gen
+    int    _m;                                  // cmaes pop size
+    int    _m_elite;                            // cmaes/ga num parents
+    int    _c;                                  // ga num of children
     int    _G;                                  // num of generations
-    int    _m;                                  // pop size
-    int    _m_elite;                            // num elites
-    int    _n;                              // number of variables
+    int    _n;                                  // number of variables
 
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x param + obj)
-    Eigen::MatrixXd _param_curr, _param_next;
+    Eigen::MatrixXd _param_curr;
 
     // performance vectors
     std::vector<double> _top_performer; 
@@ -51,26 +51,12 @@ class CMAES {
     std::vector<double> _top_obj_pi, _top_obj_pidot, _top_obj_mdot, _top_obj_m;
     std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
 
-    // statistical parameters
-    bool _stdzd;                                // flag for normalized data
-
     Eigen::VectorXd _max_constraints;           // max constraints        ∈ ℝ(n_var)
     Eigen::VectorXd _min_constraints;           // min constraints        ∈ ℝ(n_var)
-    Eigen::VectorXd _stdz_avg;                  // param averages         ∈ ℝ(n_var)
-    Eigen::VectorXd _stdz_std;                  // param stds             ∈ ℝ(n_var)
-    Eigen::MatrixXd _Cov;                       // covariance matrix      ∈ ℝ(n_var x n_var)
-    Eigen::MatrixXd _Xs;                        // stdzd, transposed data ∈ ℝ(n_var x m)
-    Eigen::VectorXd _mu;                        // mean vector            ∈ ℝ(n_var)
-
-    void init_Cov(Eigen::MatrixXd& Cov, Eigen::VectorXd& mu);
 
     void gen_Zs(Eigen::MatrixXd& Z);
 
     void sort_data(Eigen::MatrixXd& param);
-
-    void stdz_data(Eigen::MatrixXd& param);
-
-    void unstdz_data(Eigen::MatrixXd& param);
 
   public:
   
@@ -85,9 +71,6 @@ class CMAES {
 
     /* destructor */
     ~CMAES();
-
-    /* initialize CMAES */
-    void initialize();
 
     /* optimize CMAES */
     void optimize();
