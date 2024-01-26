@@ -72,8 +72,7 @@ class CMAES {
   
     /* overload constructor */
     CMAES(sim& s,
-          constraints& c, 
-          bopt& b, 
+          constraints& c,
           int obj_fn,
           int n_var,
           const double* weights,

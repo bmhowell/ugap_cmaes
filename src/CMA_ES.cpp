@@ -6,8 +6,7 @@
 
 // PUBLIC METHODS
 CMAES::CMAES(sim& s,
-             constraints& c, 
-             bopt& b, 
+             constraints& c,
              int obj_fn,
              int n,
              const double* weights,
@@ -32,7 +31,6 @@ CMAES::CMAES(sim& s,
 
     // initialize simulation/optimization parameters and constraints
     _sim   = s;
-    _b     = b;
     _con   = c;
 
     // objective function weights
@@ -315,10 +313,10 @@ void CMAES::run_par_sim() {
 
     // generate particles
     sim.computeParticles(_param_curr(m, 1),
-                          _param_curr(m, 2));
+                         _param_curr(m, 2));
 
     // run simulation
-    sim.simulate(_sim.method,             // time stepping scheme
+    sim.simulate( _sim.method,             // time stepping scheme
                   _save_voxel,             // save voxel values
                   _obj_fn,                 // objective function
                   _w                       // pareto weights

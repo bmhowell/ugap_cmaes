@@ -18,14 +18,6 @@ int main(int argc, char** argv) {
   int obj_fn = 5;
   double default_weights[4] = {0.1, 0.2, 0.2, 0.5};
   double pareto_weights[4]  = {3.56574286e-09, 2.42560512e-03, 2.80839829e-01, 7.14916061e-01};
-
-
-  bopt b;
-  b.temp = 303.15;
-  b.rp   = 0.00084 / 10;
-  b.vp   = 0.7;
-  b.uvi  = 10.;
-  b.uvt  = 30.;
   
   sim s;
   s.time_stepping = 0;
@@ -40,7 +32,6 @@ int main(int argc, char** argv) {
   // initialize CMA-ES
   CMAES optimizer = CMAES(s,                  // simulation parameters
                           c,                  // optimization constraints
-                          b,                  // optimization parameters
                           obj_fn,             // objective function
                           5,                  // number of variables
                           pareto_weights,     // objective function weights
