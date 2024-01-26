@@ -51,11 +51,19 @@ class CMAES {
 
     Eigen::VectorXd _max_constraints;           // max constraints        ∈ ℝ(n_var)
     Eigen::VectorXd _min_constraints;           // min constraints        ∈ ℝ(n_var)
+    std::vector<double> _objs;                  // objective function     ∈ ℝ(pop)
+
+    // temp matrices for sorting
+    Eigen::MatrixXd _param_curr_temp;
+    Eigen::MatrixXd _Xc_temp;
+    Eigen::MatrixXd _Zs_temp;
 
     void gen_Zs(Eigen::MatrixXd& Z);
 
     void sort_param(Eigen::MatrixXd& PARAM);
     
+    std::vector<size_t> sort_objs(std::vector<double>& OBJS);
+
     void run_par_sim();
 
     void track_var();

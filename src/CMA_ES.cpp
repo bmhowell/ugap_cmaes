@@ -28,6 +28,7 @@ CMAES::CMAES(sim& s,
 
     // || temp | rm | vp | uvi | uvt | obj_pi | obj_pidot | obj_mdot | obj_m | obj || ∈ ℝ (pop x (param + objs))
     _param_curr.resize(_m, 10);
+    _objs.resize(_m);
 
     // initialize simulation/optimization parameters and constraints
     _sim   = s;
@@ -109,6 +110,7 @@ void CMAES::optimize() {
   Eigen::MatrixXd Zs_temp;
   Eigen::MatrixXd tmp;
   Eigen::VectorXd objs;
+  std::vector<size_t> inds;
 
   // initialize "data" as constraints
   Eigen::MatrixXd init_data(2, _n); 
@@ -142,7 +144,17 @@ void CMAES::optimize() {
     this->run_par_sim();
 
     // sort by fitness
-    this->sort_param(_param_curr);
+    inds = this->sort_objs(_objs);
+    
+    // sort param, Xc, Zs, and objs
+    _param_curr_temp = _param_curr;
+    _Xc_temp = Xc;
+    _Zs_temp = Zs;
+    for (int i = 0; i < _m; ++i) {
+      _param_curr.row(i) = _param_curr_temp.row(inds[i]);
+      Xc.col(i) = _Xc_temp.col(inds[i]);
+      Zs.col(i) = _Zs_temp.col(inds[i]);
+    }
 
     // track variables
     this->track_var();
@@ -151,10 +163,8 @@ void CMAES::optimize() {
     if (g < _G - 1) {
       // copy ranked data back to Xc
       Xc = _param_curr.block(0, 0, _m, _n).transpose();
-
       xmu = Xc * ws;
       zmu = Zs * ws;
-
       // cumulation: update evolution paths
       ps   = (1. - cs) * ps + std::sqrt(cs * (2. - cs) * mu_eff) * B * zmu;
       hsig = ps.norm() / std::sqrt(1. - std::pow(1. - cs, 2. * count_eval / _m)) / chiN < 1.4 + 2. / (_n + 1.);
@@ -186,7 +196,7 @@ void CMAES::optimize() {
       }
     }
     
-    std::cout << "OBJECTIVES: " << _param_curr(0, 9) << std::endl;
+    std::cout << "OBJECTIVES: " << _top_performer.back() << std::endl;
     std::cout << "=========================\n" << std::endl;
     
     std::cout << std::endl;
@@ -276,7 +286,19 @@ void CMAES::sort_param(Eigen::MatrixXd& PARAM) {
     }
 }
 
+std::vector<size_t> CMAES::sort_objs(std::vector<double>& OBJS) {
+  // create an index array and sort it using the comparator
+  std::vector<std::size_t> inds(OBJS.size()); 
+  std::iota(inds.begin(), inds.end(), 0);
+  std::sort(inds.begin(), inds.end(), [&](std::size_t i, std::size_t j) {
+      return OBJS[i] < OBJS[j];
+  });
+
+  return inds;
+}
+
 void CMAES::run_par_sim() {
+
   // evaluate objective function
   #pragma omp parallel for 
   for (int m = 0; m < _m; m++) {
@@ -307,6 +329,7 @@ void CMAES::run_par_sim() {
     {
       int thread_id = omp_get_thread_num();
       if (!std::isnan(sim.getObjective())) {
+        _objs[m] = sim.getObjective();
         _param_curr(m, 9) = sim.getObjective();
         _param_curr(m, 8) = sim.getObjM();
         _param_curr(m, 7) = sim.getObjMDot();
@@ -325,13 +348,14 @@ void CMAES::run_par_sim() {
 
 void CMAES::track_var() {
   // track top, avg top, avg total objs
-  if (_param_curr(0, 9) < _top_performer.back() && _top_performer.size() > 0) {
+  if (_top_performer.size() == 0 || _param_curr(0, 9) < _top_performer.back()) {
     _top_performer.push_back(_param_curr(0, 9));
   } else {
     _top_performer.push_back(_top_performer.back());
   }
+  
   // _top_performer.push_back(_param_curr(0, 9));
-  _avg_parent.push_back(_param_curr.col(9).head(4).mean());
+  _avg_parent.push_back(_param_curr.col(9).head(_m_elite).mean());
   _avg_total.push_back(_param_curr.col(9).mean());
 
   // track top individual objectives
