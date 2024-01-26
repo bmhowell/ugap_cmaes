@@ -45,9 +45,7 @@ class CMAES {
     Eigen::MatrixXd _param_curr;
 
     // performance vectors
-    std::vector<double> _top_performer; 
-    std::vector<double> _avg_parent; 
-    std::vector<double> _avg_total;
+    std::vector<double> _top_performer, _avg_parent, _avg_total;
     std::vector<double> _top_obj_pi, _top_obj_pidot, _top_obj_mdot, _top_obj_m;
     std::vector<double> _top_temp, _top_rp, _top_vp, _top_uvi, _top_uvt;
 
@@ -56,7 +54,11 @@ class CMAES {
 
     void gen_Zs(Eigen::MatrixXd& Z);
 
-    void sort_data(Eigen::MatrixXd& param);
+    void sort_param(Eigen::MatrixXd& PARAM);
+    
+    void run_par_sim();
+
+    void track_var();
 
   public:
   
@@ -74,6 +76,7 @@ class CMAES {
 
     /* optimize CMAES */
     void optimize();
+
     
 };
 
